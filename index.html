@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sponsorship Outreach | Email Automation</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/lucide@0.294.0/dist/umd/lucide.min.js"></script>
+</head>
+
+<body>
+    <div class="glass-bg"></div>
+    <div class="container">
+        <header>
+            <div class="logo">
+                <i data-lucide="send" class="icon-main"></i>
+                <h1>Sponsorship<span>Outreach</span></h1>
+            </div>
+            <div class="status-badge dry-run">Dry Run Mode</div>
+        </header>
+
+        <main>
+            <section class="control-panel card">
+                <h2><i data-lucide="settings"></i> Control Center</h2>
+                <div class="stats">
+                    <div class="stat-item">
+                        <span class="label">Total Leads</span>
+                        <span class="value">{{ companies|length }}</span>
+                    </div>
+                </div>
+                <div class="actions">
+                    <button id="btn-dry-run" class="btn primary">
+                        <i data-lucide="play"></i> Run Dry Run
+                    </button>
+                    <button id="btn-live" class="btn danger">
+                        <i data-lucide="zap"></i> Go Live
+                    </button>
+                </div>
+                <p class="helper-text">Warning: Go Live will send actual emails using your Gmail SMTP.</p>
+            </section>
+
+            <div class="grid">
+                <section class="leads-list card">
+                    <h2><i data-lucide="users"></i> Target Companies</h2>
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Company</th>
+                                    <th>Email</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for company in companies %}
+                                <tr>
+                                    <td>{{ company.company_name }}</td>
+                                    <td>{{ company.email_address }}</td>
+                                    <td><span class="badge pending">Pending</span></td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <section class="template-preview card">
+                    <h2><i data-lucide="file-text"></i> Live Preview</h2>
+                    <div id="preview-area" class="preview-content">
+                        <p class="placeholder-msg">Run a dry run to see personalized previews here.</p>
+                    </div>
+                </section>
+            </div>
+        </main>
+    </div>
+
+    <div id="modal" class="modal">
+        <div class="modal-content card">
+            <h2>Processing Outreach...</h2>
+            <div class="progress-bar">
+                <div id="progress" class="progress"></div>
+            </div>
+            <p id="modal-status">Gathering data...</p>
+        </div>
+    </div>
+
+    <script>
+        lucide.createIcons();
+
+        const btnDryRun = document.getElementById('btn-dry-run');
+        const previewArea = document.getElementById('preview-area');
+        const modal = document.getElementById('modal');
+        const progress = document.getElementById('progress');
+        const statusText = document.getElementById('modal-status');
+
+        const btnLive = document.getElementById('btn-live');
+
+        btnDryRun.addEventListener('click', async () => {
+            modal.style.display = 'flex';
+            progress.style.width = '0%';
+            statusText.innerText = 'Initializing personalization engine...';
+
+            try {
+                const response = await fetch('/run-dry-run', { method: 'POST' });
+                const data = await response.json();
+
+                if (data.status === 'success') {
+                    progress.style.width = '100%';
+                    statusText.innerText = 'Complete! Previews generated.';
+
+                    setTimeout(() => {
+                        modal.style.display = 'none';
+                        renderPreviews(data.previews);
+                    }, 800);
+                }
+            } catch (error) {
+                statusText.innerText = 'Error: ' + error.message;
+            }
+        });
+
+        btnLive.addEventListener('click', async () => {
+            if (!confirm("⚠️ WARNING: This will send ACTUAL emails to the entire list of companies. Are you sure you want to proceed?")) {
+                return;
+            }
+
+            modal.style.display = 'flex';
+            progress.style.width = '0%';
+            statusText.innerText = 'Connecting to Gmail SMTP...';
+
+            try {
+                const response = await fetch('/run-live', { method: 'POST' });
+                const data = await response.json();
+
+                if (data.status === 'success') {
+                    progress.style.width = '100%';
+                    statusText.innerText = `Outreach Complete! Sent to ${data.results.length} companies.`;
+
+                    setTimeout(() => {
+                        modal.style.display = 'none';
+                        alert(`Success! Successfully contacted ${data.results.length} companies.`);
+                    }, 1000);
+                } else {
+                    statusText.innerText = 'Error: ' + data.message;
+                    setTimeout(() => modal.style.display = 'none', 3000);
+                }
+            } catch (error) {
+                statusText.innerText = 'Error: ' + error.message;
+                setTimeout(() => modal.style.display = 'none', 3000);
+            }
+        });
+
+        function renderPreviews(previews) {
+            previewArea.innerHTML = '';
+            previews.forEach((p, index) => {
+                const item = document.createElement('div');
+                item.className = 'preview-item fade-in';
+                item.style.animationDelay = `${index * 0.1}s`;
+                item.innerHTML = `
+                    <div class="preview-header">
+                        <strong>To:</strong> ${p.email} <br>
+                        <strong>Subject:</strong> ${p.subject}
+                    </div>
+                    <div class="preview-body">${p.body.replace(/\n/g, '<br>')}</div>
+                `;
+                previewArea.appendChild(item);
+            });
+        }
+    </script>
+</body>
+
+</html>
